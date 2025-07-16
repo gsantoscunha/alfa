@@ -47,9 +47,29 @@ if uploaded_file:
         aggfunc="sum",
         fill_value=0
     )
+
+    # Adiciona total por conta
     pivot["Total"] = pivot.sum(axis=1)
+
+    # Calcula Opening e Closing Balance
+    meses = list(pivot.columns[:-1])  # exclui a coluna "Total"
+    opening = []
+    closing = []
+    saldo = 0
+
+    for mes in meses:
+        opening.append(saldo)
+        saldo += pivot[mes].sum()
+        closing.append(saldo)
+
+    opening_df = pd.DataFrame([opening + [sum(opening)]], columns=meses + ["Total"], index=["Opening Balance"])
+    closing_df = pd.DataFrame([closing + [sum(closing)]], columns=meses + ["Total"], index=["Closing Balance"])
+
+    # Junta tudo com abertura e fechamento
+    resultado_df = pd.concat([opening_df, pivot, closing_df])
+
     st.subheader("📋 Tabela Consolidada por Categoria")
-    st.dataframe(pivot.style.format("R$ {:,.2f}").applymap(
+    st.dataframe(resultado_df.style.format("R$ {:,.2f}").applymap(
         lambda v: "color: green" if v > 0 else ("color: red" if v < 0 else "")
     ), use_container_width=True)
 
@@ -61,7 +81,8 @@ if uploaded_file:
         output.seek(0)
         return output
 
-    excel_data = to_excel(pivot)
+    excel_data = to_excel(resultado_df)
     st.download_button("⬇️ Baixar Excel Consolidado", data=excel_data, file_name="fluxo_consolidado.xlsx")
+
 
 
