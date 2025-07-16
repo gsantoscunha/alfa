@@ -21,14 +21,14 @@ if uploaded_file:
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True)
     df["AnoMes"] = df["Data"].dt.to_period("M").astype(str)
 
-    # Tradução manual dos meses
+    # Tradução manual dos meses em português
     meses_pt = {
         1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
         5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
         9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
     }
 
-    # Exibição do mês atual
+    # Última data e rótulo de mês/ano
     data_final = df["Data"].max()
     nome_mes = meses_pt[data_final.month]
     label_mes = f"{nome_mes} / {data_final.year}"
@@ -44,17 +44,20 @@ if uploaded_file:
     entradas_mes = df_ultimo[df_ultimo["Valor"] > 0]["Valor"].sum()
     saidas_mes = df_ultimo[df_ultimo["Valor"] < 0]["Valor"].sum()
 
+    # 📆 Mostrar data no KPI
+    data_str = data_final.strftime("%d/%m/%Y")
+
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💰 Saldo Atual", f"R$ {saldo_atual:,.2f}")
+    col1.metric(f"💰 Saldo Atual em {data_str}", f"R$ {saldo_atual:,.2f}")
     col2.metric("⬆️ Entradas no mês", f"R$ {entradas_mes:,.2f}")
     col3.metric("⬇️ Saídas no mês", f"R$ {abs(saidas_mes):,.2f}")
     col4.metric("📊 Resultado", f"R$ {(entradas_mes + saidas_mes):,.2f}")
 
-    # Gráfico de saldo acumulado
+    # 📈 Gráfico de saldo acumulado
     fig = px.line(df_mes, x="Mês", y="Saldo Acumulado", title="📈 Evolução do Saldo Acumulado", markers=True)
     st.plotly_chart(fig, use_container_width=True)
 
-    # Pivot por Conta x Mês
+    # 📊 Tabela mensal por conta
     pivot = df.pivot_table(
         index="Conta",
         columns="AnoMes",
@@ -64,8 +67,8 @@ if uploaded_file:
     )
     pivot["Total"] = pivot.sum(axis=1)
 
-    # Opening e Closing Balance
-    meses = list(pivot.columns[:-1])  # remove "Total"
+    # ➕ Opening e Closing Balance
+    meses = list(pivot.columns[:-1])  # exclui "Total"
     opening = []
     closing = []
     saldo = 0
@@ -77,7 +80,7 @@ if uploaded_file:
     opening_df = pd.DataFrame([opening + [sum(opening)]], columns=meses + ["Total"], index=["Opening Balance"])
     closing_df = pd.DataFrame([closing + [sum(closing)]], columns=meses + ["Total"], index=["Closing Balance"])
 
-    # Combinar tudo em um dataframe final
+    # 🧾 Consolidar tabela final
     resultado_df = pd.concat([opening_df, pivot, closing_df])
 
     st.subheader("📋 Tabela Consolidada por Categoria")
@@ -85,7 +88,7 @@ if uploaded_file:
         lambda v: "color: green" if v > 0 else ("color: red" if v < 0 else "")
     ), use_container_width=True)
 
-    # Exportar como Excel
+    # ⬇️ Exportar para Excel
     def to_excel(df):
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -95,4 +98,3 @@ if uploaded_file:
 
     excel_data = to_excel(resultado_df)
     st.download_button("⬇️ Baixar Excel Consolidado", data=excel_data, file_name="fluxo_consolidado.xlsx")
-
