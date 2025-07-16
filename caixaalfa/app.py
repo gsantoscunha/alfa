@@ -7,7 +7,7 @@ import calendar
 # ========== AUTENTICAÇÃO ==========
 users = {
     "admin": "senhaadmin123",
-    "financeiro": "1234"
+    "financeiro": "123456789"
 }
 
 def login():
