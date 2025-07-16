@@ -1,64 +1,63 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+from io import BytesIO
 
-st.set_page_config(page_title="Fluxo de Caixa", layout="wide")
+st.set_page_config(page_title="Resumo Mensal - Fluxo de Caixa", layout="wide")
+st.title("📘 Fluxo de Caixa - Consolidado por Mês")
 
-st.title("📊 Dashboard de Fluxo de Caixa")
+uploaded_file = st.file_uploader("📥 Faça o upload da planilha (.xlsx)", type=["xlsx"])
 
-# Upload da planilha
-uploaded_file = st.file_uploader("Faça o upload da planilha (.xlsx)", type=["xlsx"])
 if uploaded_file:
     df = pd.read_excel(uploaded_file, sheet_name="Extrato")
     df = df.rename(columns={
         "Data de lançamento": "Data",
         "Descrição do lançamento": "Descricao",
         "Entradas / Saídas (R$)": "Valor",
-        "Conta": "Categoria"
+        "Conta": "Conta"
     })
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True)
-    df = df.sort_values(by="Data")
+    df["AnoMes"] = df["Data"].dt.to_period("M").astype(str)
 
-    # Adição manual de lançamento
-    with st.expander("➕ Adicionar nova entrada/saída"):
-        with st.form("add_entry"):
-            data = st.date_input("Data")
-            tipo = st.selectbox("Tipo", ["Entrada", "Saída"])
-            valor = st.number_input("Valor", min_value=0.01)
-            categoria = st.text_input("Categoria")
-            descricao = st.text_input("Descrição")
-            submitted = st.form_submit_button("Adicionar")
-            if submitted:
-                valor_final = valor if tipo == "Entrada" else -valor
-                nova_linha = pd.DataFrame([{
-                    "Data": data,
-                    "Descricao": descricao,
-                    "Valor": valor_final,
-                    "Categoria": categoria
-                }])
-                df = pd.concat([df, nova_linha], ignore_index=True)
-                st.success("Lançamento adicionado!")
+    # Pivot por conta x mês
+    pivot = df.pivot_table(
+        index="Conta",
+        columns="AnoMes",
+        values="Valor",
+        aggfunc="sum",
+        fill_value=0
+    )
 
-    # Métricas principais
-    saldo_total = df["Valor"].sum()
-    total_entradas = df[df["Valor"] > 0]["Valor"].sum()
-    total_saidas = df[df["Valor"] < 0]["Valor"].sum()
+    # Linha de total geral
+    pivot.loc["Total Geral"] = pivot.sum()
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("💰 Saldo Atual", f"R$ {saldo_total:,.2f}")
-    col2.metric("⬆️ Entradas", f"R$ {total_entradas:,.2f}")
-    col3.metric("⬇️ Saídas", f"R$ {abs(total_saidas):,.2f}")
+    # Cálculo de saldo inicial e final
+    opening_balances = []
+    closing_balances = []
+    saldo_acumulado = 0
 
-    # Gráfico de barras por data
-    df_grouped = df.groupby("Data")["Valor"].sum().reset_index()
-    fig1 = px.bar(df_grouped, x="Data", y="Valor", title="Fluxo Diário")
-    st.plotly_chart(fig1, use_container_width=True)
+    for col in pivot.columns:
+        opening_balances.append(saldo_acumulado)
+        saldo_periodo = pivot[col].sum()
+        saldo_acumulado += saldo_periodo
+        closing_balances.append(saldo_acumulado)
 
-    # Pizza por categoria
-    df_cat = df.groupby("Categoria")["Valor"].sum().reset_index()
-    fig2 = px.pie(df_cat, values="Valor", names="Categoria", title="Distribuição por Categoria")
-    st.plotly_chart(fig2, use_container_width=True)
+    opening_df = pd.DataFrame([opening_balances], columns=pivot.columns, index=["Opening Balance"])
+    closing_df = pd.DataFrame([closing_balances], columns=pivot.columns, index=["Closing Balance"])
 
-    # Tabela final
-    st.subheader("📄 Lançamentos")
-    st.dataframe(df.sort_values(by="Data", ascending=False), use_container_width=True)
+    # Montar tabela final
+    final_df = pd.concat([opening_df, pivot, closing_df])
+
+    st.subheader("📊 Tabela Consolidada")
+    st.dataframe(final_df.style.format("R$ {:,.2f}"), use_container_width=True)
+
+    # Exportar como Excel
+    def to_excel(df):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Resumo')
+        output.seek(0)
+        return output
+
+    excel_data = to_excel(final_df)
+    st.download_button("⬇️ Baixar Excel Consolidado", data=excel_data, file_name="fluxo_consolidado.xlsx")
+
