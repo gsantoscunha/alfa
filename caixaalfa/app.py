@@ -81,7 +81,18 @@ if uploaded_file:
     st.subheader("📋 Tabela Consolidada por Categoria")
     st.dataframe(resultado_df.style.format("R$ {:,.2f}").applymap(
         lambda v: "color: green" if v > 0 else ("color: red" if v < 0 else "")
-    ), use_container_width=Tr
+    ), use_container_width=True)
+
+    # Exportar como Excel
+    def to_excel(df):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Resumo')
+        output.seek(0)
+        return output
+
+    excel_data = to_excel(resultado_df)
+    st.download_button("⬇️ Baixar Excel Consolidado", data=excel_data, file_name="fluxo_consolidado.xlsx")
 
 
 
