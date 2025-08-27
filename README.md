@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/22009618/README.md)
 # Consolidador de Retenções (NFe/NFS-e) — Streamlit
 
 Aplicação web para enviar XMLs (ou ZIP com XMLs) e baixar um CSV consolidado com as retenções (PIS/COFINS/CSLL, IRRF, INSS, ISS).
